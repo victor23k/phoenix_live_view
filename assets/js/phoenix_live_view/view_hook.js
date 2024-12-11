@@ -277,7 +277,7 @@ export default class ViewHook {
             if(ref === false){
               reject(new Error("unable to push hook event. LiveView not connected"))
             }
-          })
+          }, this.__view().domRoot)
         } catch (error){
           reject(error)
         }
@@ -285,7 +285,7 @@ export default class ViewHook {
     }
     return this.__view().withinTargets(phxTarget, (view, targetCtx) => {
       return view.pushHookEvent(this.el, targetCtx, event, payload, onReply)
-    })
+    }, this.__view().domRoot)
   }
 
   handleEvent(event, callback){
@@ -308,7 +308,7 @@ export default class ViewHook {
   uploadTo(phxTarget, name, files){
     return this.__view().withinTargets(phxTarget, (view, targetCtx) => {
       view.dispatchUploads(targetCtx, name, files)
-    })
+    }, this.__view().domRoot)
   }
 
   __cleanup__(){

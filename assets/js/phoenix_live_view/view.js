@@ -129,7 +129,8 @@ export default class View {
     return liveViewEl ? DOM.private(liveViewEl, "view") : null
   }
 
-  constructor(el, liveSocket, parentView, flash, liveReferer){
+  constructor(el, liveSocket, parentView, flash, liveReferer, domRoot){
+    this.domRoot = domRoot || document
     this.isDead = false
     this.liveSocket = liveSocket
     this.flash = flash
@@ -183,7 +184,7 @@ export default class View {
   connectParams(liveReferer){
     let params = this.liveSocket.params(this.el)
     let manifest =
-      DOM.all(document, `[${this.binding(PHX_TRACK_STATIC)}]`)
+      DOM.all(this.domRoot, `[${this.binding(PHX_TRACK_STATIC)}]`)
         .map(node => node.src || node.href).filter(url => typeof (url) === "string")
 
     if(manifest.length > 0){ params["_track_static"] = manifest }
@@ -340,7 +341,7 @@ export default class View {
   }
 
   dropPendingRefs(){
-    DOM.all(document, `[${PHX_REF_SRC}="${this.refSrc()}"]`, el => {
+    DOM.all(this.domRoot, `[${PHX_REF_SRC}="${this.refSrc()}"]`, el => {
       el.removeAttribute(PHX_REF_LOADING)
       el.removeAttribute(PHX_REF_SRC)
       el.removeAttribute(PHX_REF_LOCK)
@@ -382,7 +383,7 @@ export default class View {
   }
 
   attachTrueDocEl(){
-    this.el = DOM.byId(this.id)
+    this.el = DOM.byId(this.id, this.domRoot)
     this.el.setAttribute(PHX_ROOT_ID, this.root.id)
   }
 
@@ -840,7 +841,7 @@ export default class View {
         this.log("error", () => [`giving up trying to mount after ${MAX_CHILD_JOIN_ATTEMPTS} tries`, resp])
         this.destroy()
       }
-      let trueChildEl = DOM.byId(this.el.id)
+      let trueChildEl = DOM.byId(this.el.id, this.domRoot)
       if(trueChildEl){
         DOM.mergeAttrs(trueChildEl, this.el)
         this.displayError([PHX_LOADING_CLASS, PHX_ERROR_CLASS, PHX_SERVER_ERROR_CLASS])
@@ -955,14 +956,14 @@ export default class View {
 
     if(onlyEls){
       onlyEls = new Set(onlyEls)
-      DOM.all(document, selector, parent => {
+      DOM.all(this.domRoot, selector, parent => {
         if(onlyEls && !onlyEls.has(parent)){ return }
         // undo any child refs within parent first
         DOM.all(parent, selector, child => this.undoElRef(child, ref, phxEvent))
         this.undoElRef(parent, ref, phxEvent)
       })
     } else {
-      DOM.all(document, selector, el => this.undoElRef(el, ref, phxEvent))
+      DOM.all(this.domRoot, selector, el => this.undoElRef(el, ref, phxEvent))
     }
   }
 
@@ -984,7 +985,7 @@ export default class View {
     let newRef = this.ref++
     let disableWith = this.binding(PHX_DISABLE_WITH)
     if(opts.loading){
-      let loadingEls = DOM.all(document, opts.loading).map(el => {
+      let loadingEls = DOM.all(this.domRoot, opts.loading).map(el => {
         return {el, lock: true, loading: true}
       })
       elements = elements.concat(loadingEls)

@@ -5,7 +5,7 @@ import {
 import DOM from "./dom"
 
 export default class DOMPostMorphRestorer {
-  constructor(containerBefore, containerAfter, updateType){
+  constructor(containerBefore, containerAfter, updateType, domRoot){
     let idsBefore = new Set()
     let idsAfter = new Set([...containerAfter.children].map(child => child.id))
 
@@ -21,6 +21,7 @@ export default class DOMPostMorphRestorer {
       }
     })
 
+    this.domRoot = domRoot || document
     this.containerId = containerAfter.id
     this.updateType = updateType
     this.elementsToModify = elementsToModify
@@ -34,11 +35,11 @@ export default class DOMPostMorphRestorer {
   //   3) New elements are going to be put in the right place by morphdom during append.
   //      For prepend, we move them to the first position in the container
   perform(){
-    let container = DOM.byId(this.containerId)
+    let container = DOM.byId(this.containerId, this.domRoot)
     this.elementsToModify.forEach(elementToModify => {
       if(elementToModify.previousElementId){
-        maybe(document.getElementById(elementToModify.previousElementId), previousElem => {
-          maybe(document.getElementById(elementToModify.elementId), elem => {
+        maybe(this.domRoot.getElementById(elementToModify.previousElementId), previousElem => {
+          maybe(this.domRoot.getElementById(elementToModify.elementId), elem => {
             let isInRightPlace = elem.previousElementSibling && elem.previousElementSibling.id == previousElem.id
             if(!isInRightPlace){
               previousElem.insertAdjacentElement("afterend", elem)
@@ -47,7 +48,7 @@ export default class DOMPostMorphRestorer {
         })
       } else {
         // This is the first element in the container
-        maybe(document.getElementById(elementToModify.elementId), elem => {
+        maybe(this.domRoot.getElementById(elementToModify.elementId), elem => {
           let isInRightPlace = elem.previousElementSibling == null
           if(!isInRightPlace){
             container.insertAdjacentElement("afterbegin", elem)
@@ -58,7 +59,7 @@ export default class DOMPostMorphRestorer {
 
     if(this.updateType == "prepend"){
       this.elementIdsToAdd.reverse().forEach(elemId => {
-        maybe(document.getElementById(elemId), elem => container.insertAdjacentElement("afterbegin", elem))
+        maybe(this.domRoot.getElementById(elemId), elem => container.insertAdjacentElement("afterbegin", elem))
       })
     }
   }

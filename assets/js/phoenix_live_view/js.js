@@ -78,7 +78,7 @@ let JS = {
       } else {
         targetView.pushEvent(eventType, sourceEl, targetCtx, event || phxEvent, data, pushOpts, callback)
       }
-    })
+    }, view.domRoot)
   },
 
   exec_navigate(e, eventType, phxEvent, view, sourceEl, el, {href, replace}){

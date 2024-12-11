@@ -151,6 +151,8 @@ export default class LiveSocket {
     this.currentLocation = clone(window.location)
     this.hooks = opts.hooks || {}
     this.uploaders = opts.uploaders || {}
+    this.rootViewSelector = opts.rootViewSelector
+    this.domRoot = opts.domRoot || document
     this.loaderTimeout = opts.loaderTimeout || LOADER_TIMEOUT
     this.reloadWithJitterTimer = null
     this.maxReloads = opts.maxReloads || MAX_RELOADS
@@ -356,19 +358,26 @@ export default class LiveSocket {
   channel(topic, params){ return this.socket.channel(topic, params) }
 
   joinDeadView(){
-    let body = document.body
-    if(body && !this.isPhxView(body) && !this.isPhxView(document.firstElementChild)){
-      let view = this.newRootView(body)
+    // attach the view to the root which can be document.body or the first div
+    // inside the shadowDOM
+    let viewRoot = this.domRoot === document ? document.body : domRoot.querySelector(":scope > div") 
+    if(viewRoot && !this.isPhxView(viewRoot) && !this.isPhxView(document.firstElementChild)){
+      let view = this.newRootView(viewRoot)
       view.setHref(this.getHref())
       view.joinDead()
-      if(!this.main){ this.main = view }
+      // When there's a rootViewSelector it's not appropriate for document.body to be the
+      // main view since all the connected elements must be scoped under that selector
+      if(!this.main && !this.rootViewSelector){this.main = view }
       window.requestAnimationFrame(() => view.execNewMounted())
     }
+  }
+  viewSelector(){
+    return `${PHX_VIEW_SELECTOR}${this.rootViewSelector || ""}`
   }
 
   joinRootViews(){
     let rootsFound = false
-    DOM.all(document, `${PHX_VIEW_SELECTOR}:not([${PHX_PARENT_ID}])`, rootEl => {
+    DOM.all(this.domRoot, `${this.viewSelector()}:not([${PHX_PARENT_ID}])`, rootEl => {
       if(!this.getRootById(rootEl.id)){
         let view = this.newRootView(rootEl)
         view.setHref(this.getHref())
@@ -402,7 +411,7 @@ export default class LiveSocket {
         this.requestDOMUpdate(() => {
           // remove phx-remove els right before we replace the main element
           removeEls.forEach(el => el.remove())
-          DOM.findPhxSticky(document).forEach(el => newMainEl.appendChild(el))
+          DOM.findPhxSticky(this.domRoot).forEach(el => newMainEl.appendChild(el))
           this.outgoingMainEl.replaceWith(newMainEl)
           this.outgoingMainEl = null
           callback && callback(linkRef)
@@ -415,7 +424,7 @@ export default class LiveSocket {
   transitionRemoves(elements, skipSticky, callback){
     let removeAttr = this.binding("remove")
     if(skipSticky){
-      const stickies = DOM.findPhxSticky(document) || []
+      const stickies = DOM.findPhxSticky(this.domRoot) || []
       elements = elements.filter(el => !DOM.isChildOfAny(el, stickies))
     }
     let silenceEvents = (e) => {
@@ -451,7 +460,11 @@ export default class LiveSocket {
   }
 
   owner(childEl, callback){
-    let view = maybe(childEl.closest(PHX_VIEW_SELECTOR), el => this.getViewByEl(el)) || this.main
+  let view = maybe(childEl.closest(this.viewSelector()), el => this.getViewByEl(el))
+    // If there's a rootViewSelector, don't default to `this.main`
+    // since it's not guaranteed to belong to same liveSocket.
+    // Maybe `this.embbededMode = boolean()` would be a more clear check?
+    if(!view && !this.rootViewSelector){ view = this.main }
     return view && callback ? callback(view) : view
   }
 
@@ -552,7 +565,7 @@ export default class LiveSocket {
       let dropTargetId = maybe(closestPhxBinding(e.target, this.binding(PHX_DROP_TARGET)), trueTarget => {
         return trueTarget.getAttribute(this.binding(PHX_DROP_TARGET))
       })
-      let dropTarget = dropTargetId && document.getElementById(dropTargetId)
+      let dropTarget = dropTargetId && DOM.byId(dropTargetId, this.domRoot)
       let files = Array.from(e.dataTransfer.files || [])
       if(!dropTarget || dropTarget.disabled || files.length === 0 || !(dropTarget.files instanceof FileList)){ return }
 
@@ -613,7 +626,7 @@ export default class LiveSocket {
             })
           })
         } else {
-          DOM.all(document, `[${windowBinding}]`, el => {
+          DOM.all(this.domRoot, `[${windowBinding}]`, el => {
             let phxEvent = el.getAttribute(windowBinding)
             this.debounce(el, e, browserEventName, () => {
               this.withinOwners(el, view => {
@@ -665,7 +678,7 @@ export default class LiveSocket {
 
   dispatchClickAway(e, clickStartedAt){
     let phxClickAway = this.binding("click-away")
-    DOM.all(document, `[${phxClickAway}]`, el => {
+    DOM.all(this.domRoot, `[${phxClickAway}]`, el => {
       if(!(el.isSameNode(clickStartedAt) || el.contains(clickStartedAt))){
         this.withinOwners(el, view => {
           let phxEvent = el.getAttribute(phxClickAway)
@@ -975,7 +988,8 @@ export default class LiveSocket {
 
   on(event, callback){
     this.boundEventNames.add(event)
-    window.addEventListener(event, e => {
+    const listenEl = this.domRoot != document ? this.domRoot : window
+    listenEl.addEventListener(event, e => {
       if(!this.silenced){ callback(e) }
     })
   }

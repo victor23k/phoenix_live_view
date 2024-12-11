@@ -26,7 +26,7 @@ import {
 } from "./utils"
 
 let DOM = {
-  byId(id){ return document.getElementById(id) || logError(`no id found for ${id}`) },
+  byId(id, domRoot = document){ return node.getElementById(id) || logError(`no id found for ${id}`) },
 
   removeClass(el, className){
     el.classList.remove(className)
@@ -49,9 +49,9 @@ let DOM = {
 
   isAutoUpload(inputEl){ return inputEl.hasAttribute("data-phx-auto-upload") },
 
-  findUploadInputs(node){
+  findUploadInputs(node, domRoot = document){
     const formId = node.id
-    const inputsOutsideForm = this.all(document, `input[type="file"][${PHX_UPLOAD_REF}][form="${formId}"]`)
+    const inputsOutsideForm = this.all(domRoot, `input[type="file"][${PHX_UPLOAD_REF}][form="${formId}"]`)
     return this.all(node, `input[type="file"][${PHX_UPLOAD_REF}]`).concat(inputsOutsideForm)
   },
 
